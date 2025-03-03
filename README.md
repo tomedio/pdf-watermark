@@ -1,6 +1,6 @@
 # PDF Watermark
 
-A PHP library for adding text and image watermarks to PDF files using Ghostscript.
+A PHP library for adding text and image watermarks to PDF files using FPDI.
 
 ## Features
 
@@ -18,36 +18,39 @@ A PHP library for adding text and image watermarks to PDF files using Ghostscrip
   - Position
   - Pages to apply the watermark to
 
-- Works with compressed PDF files
+- Works with compressed PDF files and PDFs with versions higher than 1.4
 - Recognizes page sizes and orientations
 - Modifies existing pages without adding new ones
 - Configuration-based approach
+- Configurable temporary directory for processing files
 
 ## Requirements
 
 - PHP 8.1 or higher
-- Ghostscript (9.0 or higher recommended)
+- pdftk (optional, but recommended for handling compressed PDFs with versions higher than 1.4)
 
 ## Installation
 
-### 1. Install Ghostscript
+### 1. Install pdftk (optional but recommended)
+
+pdftk is used as a workaround for handling compressed PDFs with versions higher than 1.4.
 
 #### On Ubuntu/Debian:
 
 ```bash
 sudo apt-get update
-sudo apt-get install ghostscript
+sudo apt-get install pdftk
 ```
 
 #### On macOS (using Homebrew):
 
 ```bash
-brew install ghostscript
+brew install pdftk-java
 ```
 
 #### On Windows:
 
-Download and install Ghostscript from the [official website](https://www.ghostscript.com/download/gsdnld.html).
+Download and install pdftk from the [official website](https://www.pdflabs.com/tools/pdftk-the-pdf-toolkit/).
 
 ### 2. Install the library via Composer
 
@@ -63,8 +66,8 @@ composer require tomedio/pdf-watermark
 use PdfWatermark\PdfWatermarkerFactory;
 use PdfWatermark\Watermark\AbstractWatermark;
 
-// Create a factory
-$factory = new PdfWatermarkerFactory();
+// Create a factory (optionally specify the path to pdftk and a custom temp directory)
+$factory = new PdfWatermarkerFactory('pdftk', '/path/to/custom/temp/dir');
 
 // Create and configure a text watermark config
 $textConfig = $factory->createTextWatermarkConfig('CONFIDENTIAL');
@@ -172,6 +175,20 @@ $config->setPages('last');
 $config->setPages([1, '3-5', 'last']);
 ```
 
+### Custom Temporary Directory
+
+You can specify a custom temporary directory for processing files:
+
+```php
+// Specify a custom temp directory in the factory
+$factory = new PdfWatermarkerFactory('pdftk', '/path/to/custom/temp/dir');
+
+// Or directly in the PdfWatermarker constructor
+$watermarker = new PdfWatermarker('pdftk', '/path/to/custom/temp/dir');
+```
+
+If no temporary directory is specified, the system's default temporary directory (`sys_get_temp_dir()`) will be used.
+
 ## API Documentation
 
 ### PdfWatermarkerFactory
@@ -180,7 +197,7 @@ The factory class provides methods to create watermarkers, watermark configurati
 
 #### Methods
 
-- `__construct(?string $ghostscriptPath = null)`: Constructor
+- `__construct(?string $pdftk = null, ?string $tempDir = null)`: Constructor
 - `create(): PdfWatermarker`: Create a new PdfWatermarker instance
 - `createTextWatermarkConfig(string $text): TextWatermarkConfig`: Create a new text watermark configuration
 - `createImageWatermarkConfig(string $imagePath): ImageWatermarkConfig`: Create a new image watermark configuration
@@ -195,7 +212,7 @@ The main class for applying watermarks to PDF files.
 
 #### Methods
 
-- `__construct(?string $ghostscriptPath = null)`: Constructor
+- `__construct(?string $pdftk = null, ?string $tempDir = null)`: Constructor
 - `addWatermark(AbstractWatermark $watermark): self`: Add a watermark to be applied
 - `apply(string $inputFile, string $outputFile): void`: Apply watermarks to a PDF file
 
@@ -248,6 +265,17 @@ Configuration class for image watermarks.
 - `setScale(float $scale): self`: Set the scale of the image (1.0 = original size)
 - `setWidth(int $width): self`: Set the width of the image (height will be calculated to maintain aspect ratio)
 - `setHeight(int $height): self`: Set the height of the image (width will be calculated to maintain aspect ratio)
+
+## PDF Version Compatibility
+
+This library uses FPDI to process PDF files, which has a limitation with compressed PDFs that have versions higher than 1.4. To overcome this limitation, the library implements a workaround using pdftk:
+
+1. When a PDF cannot be processed directly with FPDI (typically due to being a compressed PDF with version > 1.4), the library automatically falls back to using pdftk.
+2. pdftk is used to uncompress the PDF, making it compatible with FPDI.
+3. The watermarks are applied to the uncompressed PDF using FPDI.
+4. The resulting PDF is recompressed using pdftk.
+
+This approach allows the library to work with a wide range of PDF files, including those with higher versions, without requiring the paid version of FPDI.
 
 ## Examples
 

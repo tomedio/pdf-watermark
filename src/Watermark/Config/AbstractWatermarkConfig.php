@@ -68,7 +68,7 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
     /**
      * Set pages to apply the watermark to
      * 
-     * @param array|string $pages Can be:
+     * @param array|string|int $pages Can be:
      *                           - 'all' for all pages
      *                           - 'last' for the last page
      *                           - A specific page number (e.g., 1)
@@ -77,9 +77,9 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
      *                           - An array of any of the above
      * @return $this
      */
-    public function setPages(array|string $pages): self
+    public function setPages(array|string|int $pages): self
     {
-        if (is_string($pages)) {
+        if (is_string($pages) || is_int($pages)) {
             $pages = [$pages];
         }
 

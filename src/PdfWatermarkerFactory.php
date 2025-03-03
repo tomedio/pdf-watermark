@@ -11,16 +11,19 @@ use PdfWatermark\Watermark\Config\ImageWatermarkConfig;
 
 class PdfWatermarkerFactory
 {
-    private ?string $ghostscriptPath;
+    private ?string $pdftk;
+    private ?string $tempDir;
 
     /**
      * Constructor
      * 
-     * @param string|null $ghostscriptPath Path to the Ghostscript executable (defaults to 'gs')
+     * @param string|null $pdftk Path to the pdftk executable (defaults to 'pdftk')
+     * @param string|null $tempDir Path to the temporary directory (defaults to system temp directory)
      */
-    public function __construct(?string $ghostscriptPath = null)
+    public function __construct(?string $pdftk = null, ?string $tempDir = null)
     {
-        $this->ghostscriptPath = $ghostscriptPath;
+        $this->pdftk = $pdftk;
+        $this->tempDir = $tempDir;
     }
 
     /**
@@ -30,7 +33,7 @@ class PdfWatermarkerFactory
      */
     public function create(): PdfWatermarker
     {
-        return new PdfWatermarker($this->ghostscriptPath);
+        return new PdfWatermarker($this->pdftk, $this->tempDir);
     }
 
     /**

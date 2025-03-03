@@ -5,24 +5,32 @@ declare(strict_types=1);
 namespace PdfWatermark;
 
 use PdfWatermark\Watermark\AbstractWatermark;
+use PdfWatermark\Watermark\TextWatermark;
+use PdfWatermark\Watermark\ImageWatermark;
+use setasign\Fpdi\Tcpdf\Fpdi;
+use setasign\Fpdi\PdfParser\CrossReference\CrossReferenceException;
+use setasign\Fpdi\PdfParser\PdfParserException;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 
 class PdfWatermarker
 {
-    private string $ghostscriptPath;
+    private string $pdftk;
     private array $watermarks = [];
     private array $pageInfo = [];
     private int $totalPages = 0;
+    private ?string $tempDir;
 
     /**
      * Constructor
      * 
-     * @param string|null $ghostscriptPath Path to the Ghostscript executable (defaults to 'gs')
+     * @param string|null $pdftk Path to the pdftk executable (defaults to 'pdftk')
+     * @param string|null $tempDir Path to the temporary directory (defaults to system temp directory)
      */
-    public function __construct(?string $ghostscriptPath = null)
+    public function __construct(?string $pdftk = null, ?string $tempDir = null)
     {
-        $this->ghostscriptPath = $ghostscriptPath ?? 'gs';
+        $this->pdftk = $pdftk ?? 'pdftk';
+        $this->tempDir = $tempDir;
     }
 
     /**
@@ -43,7 +51,7 @@ class PdfWatermarker
      * @param string $inputFile Path to the input PDF file
      * @param string $outputFile Path to the output PDF file
      * @throws \InvalidArgumentException If the input file doesn't exist
-     * @throws \RuntimeException If Ghostscript fails
+     * @throws \RuntimeException If processing fails
      */
     public function apply(string $inputFile, string $outputFile): void
     {
@@ -55,163 +63,422 @@ class PdfWatermarker
             throw new \InvalidArgumentException('No watermarks have been added');
         }
 
-        // Extract page information from the PDF
+        // Create a temporary directory for intermediate files
+        $baseDir = $this->tempDir ?? sys_get_temp_dir();
+        $tempDir = $baseDir . '/pdf_watermark_' . uniqid();
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        try {
+            // Try to process the PDF directly
+            try {
+                $this->processPdf($inputFile, $outputFile);
+            } catch (CrossReferenceException | PdfParserException $e) {
+                // If we get a parser exception, try the pdftk workaround
+                $this->processPdfWithPdftk($inputFile, $outputFile, $tempDir);
+            }
+        } finally {
+            // Clean up temporary files
+            $this->cleanupTempDir($tempDir);
+        }
+    }
+
+    /**
+     * Process a PDF file directly using FPDI
+     * 
+     * @param string $inputFile Path to the input PDF file
+     * @param string $outputFile Path to the output PDF file
+     * @throws PdfParserException If the PDF cannot be parsed
+     */
+    private function processPdf(string $inputFile, string $outputFile): void
+    {
+        // Extract page information
         $this->extractPageInfo($inputFile);
 
-        // Create a temporary PostScript file for the watermarks
-        $tempFile = $this->createTempFile();
-        $this->generateWatermarkPostScript($tempFile);
+        // Create a new PDF document
+        $pdf = new Fpdi();
+        
+        // Disable auto page break to prevent unexpected new pages
+        $pdf->SetAutoPageBreak(false);
+        
+        // Set the source file
+        $pdf->setSourceFile($inputFile);
+        
+        // Process each page
+        for ($pageNo = 1; $pageNo <= $this->totalPages; $pageNo++) {
+            // Import the page
+            $templateId = $pdf->importPage($pageNo, 'MediaBox');
+            
+            // Get the page size
+            $size = $pdf->getTemplateSize($templateId);
+            
+            // Add a page with the same size and orientation
+            if ($size['width'] > $size['height']) {
+                $pdf->AddPage('L', [$size['width'], $size['height']]);
+            } else {
+                $pdf->AddPage('P', [$size['width'], $size['height']]);
+            }
+            
+            // Use the imported page as a template
+            $pdf->useTemplate($templateId);
+            
+            // Apply watermarks to this page
+            foreach ($this->watermarks as $watermark) {
+                $this->applyWatermarkToPage($pdf, $watermark, $pageNo, $size);
+            }
+        }
+        
+        // Output the PDF - ensure the path is properly formatted
+        $pdf->Output($outputFile, 'F');
+    }
 
-        // Apply the watermarks using Ghostscript
-        $this->runGhostscript($inputFile, $outputFile, $tempFile);
+    /**
+     * Process a PDF file using the pdftk workaround for compressed PDFs
+     * 
+     * @param string $inputFile Path to the input PDF file
+     * @param string $outputFile Path to the output PDF file
+     * @param string $tempDir Temporary directory for intermediate files
+     * @throws \RuntimeException If pdftk fails
+     */
+    private function processPdfWithPdftk(string $inputFile, string $outputFile, string $tempDir): void
+    {
+        // Uncompress the PDF using pdftk
+        $uncompressedFile = $tempDir . '/uncompressed.pdf';
+        $this->runPdftk($inputFile, $uncompressedFile, 'uncompress');
+        
+        // Process the uncompressed PDF
+        $processedFile = $tempDir . '/processed.pdf';
+        $this->processPdf($uncompressedFile, $processedFile);
+        
+        // Recompress the PDF
+        $this->runPdftk($processedFile, $outputFile, 'compress');
+    }
 
-        // Clean up
-        unlink($tempFile);
+    /**
+     * Run pdftk command
+     * 
+     * @param string $inputFile Input file path
+     * @param string $outputFile Output file path
+     * @param string $operation Operation to perform (compress or uncompress)
+     * @throws \RuntimeException If pdftk fails
+     */
+    private function runPdftk(string $inputFile, string $outputFile, string $operation): void
+    {
+        $process = new Process([
+            $this->pdftk,
+            $inputFile,
+            'output',
+            $outputFile,
+            $operation
+        ]);
+        
+        $process->run();
+        
+        if (!$process->isSuccessful()) {
+            throw new ProcessFailedException($process);
+        }
     }
 
     /**
      * Extract page information from the PDF
      * 
      * @param string $inputFile Path to the input PDF file
-     * @throws \RuntimeException If Ghostscript fails
      */
     private function extractPageInfo(string $inputFile): void
     {
         $this->pageInfo = [];
-        $this->totalPages = 0;
-
-        // Use Ghostscript to extract page information
-        $process = new Process([
-            $this->ghostscriptPath,
-            '-q',
-            '-dNODISPLAY',
-            '-dNOSAFER',
-            '-dBATCH',
-            '-dNOPAUSE',
-            '-c',
-            "(" . $inputFile . ") (r) file runpdfbegin pdfpagecount = quit",
-        ]);
-
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            throw new ProcessFailedException($process);
-        }
-
-        $this->totalPages = (int) trim($process->getOutput());
-
-        // Extract page sizes
-        for ($i = 1; $i <= $this->totalPages; $i++) {
-            $process = new Process([
-                $this->ghostscriptPath,
-                '-q',
-                '-dNODISPLAY',
-                '-dNOSAFER',
-                '-dBATCH',
-                '-dNOPAUSE',
-                '-c',
-                "(" . $inputFile . ") (r) file runpdfbegin " . $i . " pdfgetpage /MediaBox get == quit",
-            ]);
-
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                throw new ProcessFailedException($process);
-            }
-
-            $output = trim($process->getOutput());
-            preg_match('/\[(.*?)\]/', $output, $matches);
-
-            if (isset($matches[1])) {
-                $dimensions = explode(' ', $matches[1]);
-                $this->pageInfo[$i] = [
-                    'width' => (float) ($dimensions[2] ?? 0),
-                    'height' => (float) ($dimensions[3] ?? 0),
-                    'orientation' => isset($dimensions[2], $dimensions[3]) && $dimensions[2] > $dimensions[3] ? 'landscape' : 'portrait',
-                ];
-            } else {
-                // Default to A4 if we can't extract the dimensions
-                $this->pageInfo[$i] = [
-                    'width' => 595.0,
-                    'height' => 842.0,
-                    'orientation' => 'portrait',
-                ];
-            }
+        
+        // Create a temporary FPDI instance to get page information
+        $pdf = new Fpdi();
+        $this->totalPages = $pdf->setSourceFile($inputFile);
+        
+        for ($pageNo = 1; $pageNo <= $this->totalPages; $pageNo++) {
+            $templateId = $pdf->importPage($pageNo);
+            $size = $pdf->getTemplateSize($templateId);
+            
+            $this->pageInfo[$pageNo] = [
+                'width' => $size['width'],
+                'height' => $size['height'],
+                'orientation' => $size['width'] > $size['height'] ? 'landscape' : 'portrait',
+            ];
         }
     }
 
     /**
-     * Generate PostScript code for the watermarks
+     * Apply a watermark to a specific page
      * 
-     * @param string $outputFile Path to the output PostScript file
+     * @param Fpdi $pdf The PDF document
+     * @param AbstractWatermark $watermark The watermark to apply
+     * @param int $pageNo The page number
+     * @param array $size The page size information
      */
-    private function generateWatermarkPostScript(string $outputFile): void
+    private function applyWatermarkToPage(Fpdi $pdf, AbstractWatermark $watermark, int $pageNo, array $size): void
     {
-        $ps = [];
-        $ps[] = "%!PS-Adobe-3.0";
-        $ps[] = "% Watermark PostScript file";
-        $ps[] = "";
-        $ps[] = "% Define watermark procedure";
-        $ps[] = "/WatermarkPage {";
-        $ps[] = "  /PageNo exch def";
-        $ps[] = "  /PageDict exch def";
-        $ps[] = "";
-
-        // Add watermarks
-        foreach ($this->watermarks as $index => $watermark) {
-            $ps[] = "  % Watermark " . ($index + 1);
-            $ps[] = "  PageNo PageDict " . $this->getWatermarkProcName($index) . " exec";
+        // Check if this page should be watermarked
+        if (!$this->shouldWatermarkPage($watermark->getPages(), $pageNo)) {
+            return;
         }
-
-        $ps[] = "} def";
-        $ps[] = "";
-
-        // Define watermark procedures
-        foreach ($this->watermarks as $index => $watermark) {
-            $ps[] = "% Watermark " . ($index + 1) . " procedure";
-            $ps[] = "/" . $this->getWatermarkProcName($index) . " {";
-            $ps[] = "  /PageDict exch def";
-            $ps[] = "  /PageNo exch def";
-            $ps[] = "";
-            $ps[] = "  % Check if this page should be watermarked";
-            $ps[] = "  " . $this->generatePageCheckCode($watermark->getPages());
-            $ps[] = "  {";
-            
-            // Generate watermark code for each page size/orientation
-            foreach ($this->pageInfo as $pageNo => $info) {
-                $ps[] = "    % Page " . $pageNo . " (" . $info['orientation'] . ")";
-                $ps[] = "    PageNo " . $pageNo . " eq {";
-                $ps[] = "      " . str_replace("\n", "\n      ", $watermark->generatePostScript($info));
-                $ps[] = "    } if";
-            }
-            
-            $ps[] = "  } if";
-            $ps[] = "} def";
-            $ps[] = "";
+        
+        // Apply the watermark based on its type
+        if ($watermark instanceof TextWatermark) {
+            $this->applyTextWatermark($pdf, $watermark, $size);
+        } elseif ($watermark instanceof ImageWatermark) {
+            $this->applyImageWatermark($pdf, $watermark, $size);
         }
-
-        // Write to file
-        file_put_contents($outputFile, implode("\n", $ps));
     }
 
     /**
-     * Generate PostScript code to check if a page should be watermarked
+     * Apply a text watermark to the current page
+     * 
+     * @param Fpdi $pdf The PDF document
+     * @param TextWatermark $watermark The text watermark to apply
+     * @param array $size The page size information
+     */
+    private function applyTextWatermark(Fpdi $pdf, TextWatermark $watermark, array $size): void
+    {
+        $config = $watermark->getConfig();
+        $text = $watermark->getText();
+        
+        // Set font
+        $pdf->SetFont($config->getFont(), $config->getFontStyle(), $config->getFontSize());
+        
+        // Get position and text dimensions
+        $position = $watermark->getPosition();
+        $textWidth = $pdf->GetStringWidth($text);
+        $fontSize = $config->getFontSize();
+        $padding = $config->getPadding();
+        
+        // Calculate rectangle dimensions - consistent for all positions
+        $rectWidth = $textWidth + (2 * $padding);
+        $rectHeight = $fontSize; // Increased height to better contain the text
+        
+        // Initialize rectangle and text positions
+        $rectX = 0;
+        $rectY = 0;
+        $textX = 0;
+        $textY = 0;
+        
+        // Calculate positions based on alignment
+        // Horizontal positioning
+        if (strpos($position, 'left') !== false) {
+            // Left alignment - stick to left border
+            $rectX = 0;
+            $textX = $rectX + $padding; // Text centered in rectangle horizontally
+        } elseif (strpos($position, 'right') !== false) {
+            // Right alignment - stick to right border
+            $rectX = $size['width'] - $rectWidth;
+            $textX = $rectX + $padding; // Text centered in rectangle horizontally
+        } else {
+            // Center alignment
+            $rectX = ($size['width'] - $rectWidth) / 2;
+            $textX = $rectX + $padding; // Text centered in rectangle horizontally
+        }
+        
+        // Vertical positioning
+        if (strpos($position, 'top') !== false) {
+            // Top alignment - stick to top border
+            $rectY = 0;
+            // For vertical centering, we need to account for the font's baseline
+            // TCPDF's Text() method positions text at the baseline, not at the top
+            // The formula below places the text in the middle of the rectangle
+            $textY = $rectY - ($rectHeight / 2) + ($fontSize );
+        } elseif (strpos($position, 'bottom') !== false) {
+            // Bottom alignment - stick to bottom border
+            $rectY = $size['height'] - $rectHeight;
+            $textY = $rectY - ($rectHeight / 2) + ($fontSize );
+        } else {
+            // Middle alignment
+            $rectY = ($size['height'] - $rectHeight) / 2;
+            $textY = $rectY - ($rectHeight / 2) + ($fontSize );
+        }
+        
+        // Apply rotation if needed
+        if ($watermark->getAngle() != 0) {
+            $pdf->StartTransform();
+            // Rotate around the center of the rectangle
+            $pdf->Rotate($watermark->getAngle(), $rectX + ($rectWidth / 2), $rectY + ($rectHeight / 2));
+        }
+        
+        // Get background color and opacity
+        $bgOpacity = $config->getBackgroundOpacity();
+        
+        // Draw background if opacity is greater than 0
+        if ($bgOpacity > 0) {
+            // Convert hex background color to RGB
+            $bgColorHex = $config->getBackgroundColor();
+            $r = hexdec(substr($bgColorHex, 0, 2));
+            $g = hexdec(substr($bgColorHex, 2, 2));
+            $b = hexdec(substr($bgColorHex, 4, 2));
+            
+            // Set background color
+            $pdf->SetFillColor($r, $g, $b);
+            
+            // Set background opacity
+            $this->setOpacity($pdf, $bgOpacity);
+            
+            // Draw background rectangle - consistent for all positions
+            $pdf->Rect(
+                $rectX,
+                $rectY,
+                $rectWidth,
+                $rectHeight,
+                'F'
+            );
+        }
+        
+        // Set text color and opacity
+        $textColor = $config->getTextColor();
+        $pdf->SetTextColor($textColor[0], $textColor[1], $textColor[2]);
+        $this->setOpacity($pdf, $config->getTextOpacity());
+        
+        // Draw text - centered in the rectangle
+        $pdf->Text($textX, $textY, $text);
+        
+        // Reset transformation
+        if ($watermark->getAngle() != 0) {
+            $pdf->StopTransform();
+        }
+    }
+
+    /**
+     * Apply an image watermark to the current page
+     * 
+     * @param Fpdi $pdf The PDF document
+     * @param ImageWatermark $watermark The image watermark to apply
+     * @param array $size The page size information
+     */
+    private function applyImageWatermark(Fpdi $pdf, ImageWatermark $watermark, array $size): void
+    {
+        $config = $watermark->getConfig();
+        $imagePath = $config->getImagePath();
+        
+        // Get image dimensions
+        list($imgWidth, $imgHeight) = getimagesize($imagePath);
+        
+        // Apply scaling
+        $scale = $config->getScale();
+        $imgWidth *= $scale;
+        $imgHeight *= $scale;
+        
+        // Calculate position
+        list($x, $y) = $this->calculatePosition(
+            $watermark->getPosition(),
+            $size,
+            $imgWidth,
+            $imgHeight
+        );
+        
+        // Apply rotation if needed
+        if ($watermark->getAngle() != 0) {
+            $pdf->StartTransform();
+            $pdf->Rotate($watermark->getAngle(), $x + ($imgWidth / 2), $y - ($imgHeight / 2));
+        }
+        
+        // Set opacity
+        $this->setOpacity($pdf, $watermark->getOpacity());
+        
+        // Adjust y-coordinate based on position
+        // In TCPDF, the y-coordinate for Image is the top-left corner
+        $position = $watermark->getPosition();
+        if (strpos($position, 'bottom') !== false) {
+            // For bottom positioning, adjust y to place the image at the bottom
+            $y = $y - $imgHeight;
+        } else if (strpos($position, 'top') !== false) {
+            // For top positioning, no adjustment needed as y already includes height
+        } else {
+            // For middle positioning, center the image vertically
+            $y = $y - $imgHeight / 2;
+        }
+        
+        // Add image
+        $pdf->Image($imagePath, $x, $y, $imgWidth, $imgHeight);
+        
+        // Reset transformation
+        if ($watermark->getAngle() != 0) {
+            $pdf->StopTransform();
+        }
+    }
+
+    /**
+     * Set the opacity for the next drawing operation
+     * 
+     * @param Fpdi $pdf The PDF document
+     * @param float $opacity The opacity value (0-1)
+     */
+    private function setOpacity(Fpdi $pdf, float $opacity): void
+    {
+        // Create opacity ExtGState
+        $opacityName = sprintf('Opacity%.2F', $opacity * 100);
+        
+        // TCPDF has a method to set alpha which handles the ExtGState internally
+        $pdf->setAlpha($opacity, 'Normal');
+    }
+
+    /**
+     * Calculate the position for a watermark based on its alignment
+     * 
+     * @param string $position Position identifier (e.g., 'center', 'top-left')
+     * @param array $pageSize Page dimensions
+     * @param float $width Watermark width
+     * @param float $height Watermark height
+     * @return array [x, y] coordinates
+     */
+    private function calculatePosition(string $position, array $pageSize, float $width, float $height): array
+    {
+        $x = 0;
+        $y = 0;
+        
+        // Horizontal position - stick to borders
+        if (strpos($position, 'left') !== false) {
+            $x = 0; // Left border
+        } elseif (strpos($position, 'right') !== false) {
+            $x = $pageSize['width'] - $width; // Right border
+        } else {
+            // Center
+            $x = ($pageSize['width'] - $width) / 2;
+        }
+        
+        // Vertical position - stick to borders
+        if (strpos($position, 'top') !== false) {
+            $y = 0; // Top border
+            // In TCPDF, for Image(), y is the top-left corner
+            // No need to add height as we're already adjusting in applyImageWatermark
+        } elseif (strpos($position, 'bottom') !== false) {
+            $y = $pageSize['height']; // Bottom border
+            // Note: For image watermarks, we're already adjusting the y-coordinate in applyImageWatermark
+            // by subtracting the image height: $pdf->Image($imagePath, $x, $y - $imgHeight, $imgWidth, $imgHeight);
+        } else {
+            // Middle
+            $y = ($pageSize['height'] + $height) / 2;
+        }
+        
+        return [$x, $y];
+    }
+
+    /**
+     * Check if a page should be watermarked
      * 
      * @param array $pages Pages to watermark
-     * @return string PostScript code
+     * @param int $pageNo Current page number
+     * @return bool True if the page should be watermarked
      */
-    private function generatePageCheckCode(array $pages): string
+    private function shouldWatermarkPage(array $pages, int $pageNo): bool
     {
-        $conditions = [];
-
+        if (in_array('all', $pages)) {
+            return true;
+        }
+        
+        if (in_array('last', $pages) && $pageNo == $this->totalPages) {
+            return true;
+        }
+        
+        if (in_array((string) $pageNo, $pages)) {
+            return true;
+        }
+        
         foreach ($pages as $page) {
-            if ($page === 'all') {
-                return 'true';
-            } elseif ($page === 'last') {
-                $conditions[] = "PageNo " . $this->totalPages . " eq";
-            } elseif (is_numeric($page)) {
-                $conditions[] = "PageNo " . (int) $page . " eq";
-            } elseif (is_string($page) && strpos($page, '-') !== false) {
+            if (is_string($page) && strpos($page, '-') !== false) {
                 list($start, $end) = explode('-', $page, 2);
                 
                 if ($end === 'last') {
@@ -219,70 +486,42 @@ class PdfWatermarker
                 }
                 
                 if (is_numeric($start) && is_numeric($end)) {
-                    $conditions[] = "PageNo " . (int) $start . " ge PageNo " . (int) $end . " le and";
+                    $startPage = (int) $start;
+                    $endPage = (int) $end;
+                    
+                    if ($pageNo >= $startPage && $pageNo <= $endPage) {
+                        return true;
+                    }
                 }
             }
         }
-
-        return empty($conditions) ? 'false' : implode(" ", $conditions);
-    }
-
-    /**
-     * Run Ghostscript to apply the watermarks
-     * 
-     * @param string $inputFile Path to the input PDF file
-     * @param string $outputFile Path to the output PDF file
-     * @param string $watermarkFile Path to the watermark PostScript file
-     * @throws \RuntimeException If Ghostscript fails
-     */
-    private function runGhostscript(string $inputFile, string $outputFile, string $watermarkFile): void
-    {
-        $process = new Process([
-            $this->ghostscriptPath,
-            '-q',
-            '-dBATCH',
-            '-dNOPAUSE',
-            '-sDEVICE=pdfwrite',
-            '-dPDFSETTINGS=/prepress',
-            '-dCompatibilityLevel=1.4',
-            '-dAutoRotatePages=/None',
-            '-sOutputFile=' . $outputFile,
-            '-f',
-            $watermarkFile,
-            $inputFile,
-        ]);
-
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            throw new ProcessFailedException($process);
-        }
-    }
-
-    /**
-     * Create a temporary file
-     * 
-     * @return string Path to the temporary file
-     */
-    private function createTempFile(): string
-    {
-        $tempFile = tempnam(sys_get_temp_dir(), 'watermark');
         
-        if ($tempFile === false) {
-            throw new \RuntimeException('Failed to create temporary file');
+        return false;
+    }
+
+    /**
+     * Clean up a temporary directory and all its contents
+     * 
+     * @param string $dir Path to the directory
+     */
+    private function cleanupTempDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
         }
         
-        return $tempFile;
-    }
-
-    /**
-     * Get a unique procedure name for a watermark
-     * 
-     * @param int $index Watermark index
-     * @return string Procedure name
-     */
-    private function getWatermarkProcName(int $index): string
-    {
-        return 'Watermark' . ($index + 1);
+        $files = array_diff(scandir($dir), ['.', '..']);
+        
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            
+            if (is_dir($path)) {
+                $this->cleanupTempDir($path);
+            } else {
+                unlink($path);
+            }
+        }
+        
+        rmdir($dir);
     }
 }

@@ -8,12 +8,13 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
 {
     private string $text;
     private int $fontSize = 24;
-    private string $textColor = '0 0 0'; // RGB values (0-1)
+    private string $textColor = '000000'; // Hex color
     private float $textOpacity = 1.0;
-    private string $backgroundColor = '1 1 1'; // RGB values (0-1)
+    private string $backgroundColor = 'ffffff'; // Hex color
     private float $backgroundOpacity = 0.0; // Default to transparent background
     private int $padding = 5;
     private string $fontName = 'Helvetica';
+    private string $fontStyle = '';
 
     public function __construct(string $text)
     {
@@ -45,7 +46,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     public function setTextColor(int $r, int $g, int $b): self
     {
         $this->validateRgbValues($r, $g, $b);
-        $this->textColor = $this->rgbToPostScript($r, $g, $b);
+        $this->textColor = sprintf('%02x%02x%02x', $r, $g, $b);
         return $this;
     }
 
@@ -74,7 +75,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     public function setBackgroundColor(int $r, int $g, int $b): self
     {
         $this->validateRgbValues($r, $g, $b);
-        $this->backgroundColor = $this->rgbToPostScript($r, $g, $b);
+        $this->backgroundColor = sprintf('%02x%02x%02x', $r, $g, $b);
         return $this;
     }
 
@@ -117,6 +118,16 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
+     * @param string $fontStyle Font style (e.g., 'B' for bold, 'I' for italic)
+     * @return $this
+     */
+    public function setFontStyle(string $fontStyle): self
+    {
+        $this->fontStyle = $fontStyle;
+        return $this;
+    }
+
+    /**
      * Get the text of the watermark
      */
     public function getText(): string
@@ -133,11 +144,24 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
-     * Get the text color of the watermark in PostScript format
+     * Get the text color of the watermark as RGB array
+     * 
+     * @return array [r, g, b] values (0-255)
      */
-    public function getTextColor(): string
+    public function getTextColor(): array
     {
-        return $this->textColor;
+        // Convert hex color to RGB array
+        $hex = ltrim($this->textColor, '#');
+        if (strlen($hex) === 6) {
+            return [
+                hexdec(substr($hex, 0, 2)), // r
+                hexdec(substr($hex, 2, 2)), // g
+                hexdec(substr($hex, 4, 2))  // b
+            ];
+        }
+        
+        // Default to black if invalid
+        return [0, 0, 0];
     }
 
     /**
@@ -149,7 +173,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
-     * Get the background color of the watermark in PostScript format
+     * Get the background color of the watermark in hex format
      */
     public function getBackgroundColor(): string
     {
@@ -181,6 +205,23 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
+     * Get the font style of the watermark
+     */
+    public function getFontStyle(): string
+    {
+        return $this->fontStyle;
+    }
+
+    /**
+     * Get the font to use for the watermark
+     * This is a convenience method that returns the font name
+     */
+    public function getFont(): string
+    {
+        return $this->fontName;
+    }
+
+    /**
      * Validate RGB values
      * 
      * @param int $r Red component (0-255)
@@ -193,18 +234,5 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
         if ($r < 0 || $r > 255 || $g < 0 || $g > 255 || $b < 0 || $b > 255) {
             throw new \InvalidArgumentException('RGB values must be between 0 and 255');
         }
-    }
-    
-    /**
-     * Convert RGB values to PostScript RGB format (0-1)
-     * 
-     * @param int $r Red component (0-255)
-     * @param int $g Green component (0-255)
-     * @param int $b Blue component (0-255)
-     * @return string PostScript RGB string
-     */
-    private function rgbToPostScript(int $r, int $g, int $b): string
-    {
-        return sprintf("%.3f %.3f %.3f", $r / 255, $g / 255, $b / 255);
     }
 }

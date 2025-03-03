@@ -69,12 +69,4 @@ abstract class AbstractWatermark
     {
         return $this->config;
     }
-
-    /**
-     * Generate the PostScript code for this watermark
-     * 
-     * @param array $pageInfo Information about the page (width, height, etc.)
-     * @return string PostScript code
-     */
-    abstract public function generatePostScript(array $pageInfo): string;
 }

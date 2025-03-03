@@ -50,7 +50,7 @@ class PdfWatermarkerTest extends TestCase
             $this->markTestSkipped('Ghostscript is not available');
         }
 
-        $factory = new PdfWatermarkerFactory();
+        $factory = new PdfWatermarkerFactory(null, sys_get_temp_dir());
         
         // Create and configure a text watermark config
         $textConfig = $factory->createTextWatermarkConfig('TEST');
@@ -60,7 +60,7 @@ class PdfWatermarkerTest extends TestCase
             ->setOpacity(0.5)
             ->setFontSize(72)
             ->setTextColor(255, 0, 0)
-            ->setBackgroundOpacity(0.0)
+            ->setBackgroundOpacity(1.0)
             ->setPages('all');
         
         $watermarker = $factory->createWithTextWatermark($textConfig);
@@ -78,7 +78,7 @@ class PdfWatermarkerTest extends TestCase
             $this->markTestSkipped('Ghostscript is not available');
         }
 
-        $factory = new PdfWatermarkerFactory();
+        $factory = new PdfWatermarkerFactory(null, sys_get_temp_dir());
         
         // Create and configure an image watermark config
         $imageConfig = $factory->createImageWatermarkConfig($this->testImagePath);
@@ -103,7 +103,7 @@ class PdfWatermarkerTest extends TestCase
             $this->markTestSkipped('Ghostscript is not available');
         }
 
-        $factory = new PdfWatermarkerFactory();
+        $factory = new PdfWatermarkerFactory(null, sys_get_temp_dir());
         $watermarker = $factory->create();
         
         // Create and configure a text watermark
@@ -144,7 +144,7 @@ class PdfWatermarkerTest extends TestCase
             $this->markTestSkipped('Ghostscript is not available');
         }
 
-        $factory = new PdfWatermarkerFactory();
+        $factory = new PdfWatermarkerFactory(null, sys_get_temp_dir());
         $watermarker = $factory->create();
         
         // Create and configure a watermark for the first page
@@ -178,6 +178,73 @@ class PdfWatermarkerTest extends TestCase
         
         $this->assertFileExists($this->outputPdfPath);
         $this->assertGreaterThan(0, filesize($this->outputPdfPath));
+    }
+
+    /**
+     * Test custom temp directory
+     */
+    public function testCustomTempDirectory(): void
+    {
+        // Skip test if Ghostscript is not available
+        if (!$this->isGhostscriptAvailable()) {
+            $this->markTestSkipped('Ghostscript is not available');
+        }
+
+        // Create a custom temp directory
+        $customTempDir = sys_get_temp_dir() . '/pdf_watermark_test_' . uniqid();
+        if (!is_dir($customTempDir)) {
+            mkdir($customTempDir, 0755, true);
+        }
+
+        try {
+            $factory = new PdfWatermarkerFactory(null, $customTempDir);
+            
+            // Create and configure a text watermark config
+            $textConfig = $factory->createTextWatermarkConfig('TEST');
+            $textConfig
+                ->setPosition(AbstractWatermark::POSITION_CENTER)
+                ->setAngle(45)
+                ->setOpacity(0.5)
+                ->setFontSize(72)
+                ->setTextColor(255, 0, 0)
+                ->setPages('all');
+            
+            $watermarker = $factory->createWithTextWatermark($textConfig);
+            
+            $watermarker->apply($this->testPdfPath, $this->outputPdfPath);
+            
+            $this->assertFileExists($this->outputPdfPath);
+            $this->assertGreaterThan(0, filesize($this->outputPdfPath));
+        } finally {
+            // Clean up the custom temp directory
+            if (is_dir($customTempDir)) {
+                $this->removeDirectory($customTempDir);
+            }
+        }
+    }
+
+    /**
+     * Remove a directory and all its contents recursively
+     */
+    private function removeDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        
+        $files = array_diff(scandir($dir), ['.', '..']);
+        
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            
+            if (is_dir($path)) {
+                $this->removeDirectory($path);
+            } else {
+                unlink($path);
+            }
+        }
+        
+        rmdir($dir);
     }
 
     /**
