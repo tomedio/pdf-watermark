@@ -1,0 +1,25 @@
+# Composer
+/vendor/
+composer.lock
+
+# PHPUnit
+/.phpunit.cache/
+/.phpunit.result.cache
+
+# IDE files
+/.idea/
+/.vscode/
+/.phpstorm.meta.php
+/_ide_helper.php
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Example output files
+/examples/output.pdf
