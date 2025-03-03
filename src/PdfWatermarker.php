@@ -247,8 +247,6 @@ class PdfWatermarker
             '-dCompatibilityLevel=1.4',
             '-dAutoRotatePages=/None',
             '-sOutputFile=' . $outputFile,
-            '-c',
-            '.setpdfwrite',
             '-f',
             $watermarkFile,
             $inputFile,
