@@ -52,7 +52,7 @@ Download and install Ghostscript from the [official website](https://www.ghostsc
 ### 2. Install the library via Composer
 
 ```bash
-composer require pdf-watermark/pdf-watermark
+composer require tomedio/pdf-watermark
 ```
 
 ## Basic Usage
