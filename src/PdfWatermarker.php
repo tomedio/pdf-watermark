@@ -23,7 +23,7 @@ class PdfWatermarker
 
     /**
      * Constructor
-     * 
+     *
      * @param string|null $pdftk Path to the pdftk executable (defaults to 'pdftk')
      * @param string|null $tempDir Path to the temporary directory (defaults to system temp directory)
      */
@@ -35,7 +35,7 @@ class PdfWatermarker
 
     /**
      * Add a watermark to be applied to the PDF
-     * 
+     *
      * @param AbstractWatermark $watermark The watermark to add
      * @return $this
      */
@@ -47,7 +47,7 @@ class PdfWatermarker
 
     /**
      * Apply watermarks to a PDF file
-     * 
+     *
      * @param string $inputFile Path to the input PDF file
      * @param string $outputFile Path to the output PDF file
      * @throws \InvalidArgumentException If the input file doesn't exist
@@ -86,7 +86,7 @@ class PdfWatermarker
 
     /**
      * Process a PDF file directly using FPDI
-     * 
+     *
      * @param string $inputFile Path to the input PDF file
      * @param string $outputFile Path to the output PDF file
      * @throws PdfParserException If the PDF cannot be parsed
@@ -98,44 +98,44 @@ class PdfWatermarker
 
         // Create a new PDF document
         $pdf = new Fpdi();
-        
+
         // Disable auto page break to prevent unexpected new pages
         $pdf->SetAutoPageBreak(false);
-        
+
         // Set the source file
         $pdf->setSourceFile($inputFile);
-        
+
         // Process each page
         for ($pageNo = 1; $pageNo <= $this->totalPages; $pageNo++) {
             // Import the page
             $templateId = $pdf->importPage($pageNo, 'MediaBox');
-            
+
             // Get the page size
             $size = $pdf->getTemplateSize($templateId);
-            
+
             // Add a page with the same size and orientation
             if ($size['width'] > $size['height']) {
                 $pdf->AddPage('L', [$size['width'], $size['height']]);
             } else {
                 $pdf->AddPage('P', [$size['width'], $size['height']]);
             }
-            
+
             // Use the imported page as a template
             $pdf->useTemplate($templateId);
-            
+
             // Apply watermarks to this page
             foreach ($this->watermarks as $watermark) {
                 $this->applyWatermarkToPage($pdf, $watermark, $pageNo, $size);
             }
         }
-        
+
         // Output the PDF - ensure the path is properly formatted
         $pdf->Output($outputFile, 'F');
     }
 
     /**
      * Process a PDF file using the pdftk workaround for compressed PDFs
-     * 
+     *
      * @param string $inputFile Path to the input PDF file
      * @param string $outputFile Path to the output PDF file
      * @param string $tempDir Temporary directory for intermediate files
@@ -146,18 +146,18 @@ class PdfWatermarker
         // Uncompress the PDF using pdftk
         $uncompressedFile = $tempDir . '/uncompressed.pdf';
         $this->runPdftk($inputFile, $uncompressedFile, 'uncompress');
-        
+
         // Process the uncompressed PDF
         $processedFile = $tempDir . '/processed.pdf';
         $this->processPdf($uncompressedFile, $processedFile);
-        
+
         // Recompress the PDF
         $this->runPdftk($processedFile, $outputFile, 'compress');
     }
 
     /**
      * Run pdftk command
-     * 
+     *
      * @param string $inputFile Input file path
      * @param string $outputFile Output file path
      * @param string $operation Operation to perform (compress or uncompress)
@@ -172,9 +172,9 @@ class PdfWatermarker
             $outputFile,
             $operation
         ]);
-        
+
         $process->run();
-        
+
         if (!$process->isSuccessful()) {
             throw new ProcessFailedException($process);
         }
@@ -182,21 +182,21 @@ class PdfWatermarker
 
     /**
      * Extract page information from the PDF
-     * 
+     *
      * @param string $inputFile Path to the input PDF file
      */
     private function extractPageInfo(string $inputFile): void
     {
         $this->pageInfo = [];
-        
+
         // Create a temporary FPDI instance to get page information
         $pdf = new Fpdi();
         $this->totalPages = $pdf->setSourceFile($inputFile);
-        
+
         for ($pageNo = 1; $pageNo <= $this->totalPages; $pageNo++) {
             $templateId = $pdf->importPage($pageNo);
             $size = $pdf->getTemplateSize($templateId);
-            
+
             $this->pageInfo[$pageNo] = [
                 'width' => $size['width'],
                 'height' => $size['height'],
@@ -207,7 +207,7 @@ class PdfWatermarker
 
     /**
      * Apply a watermark to a specific page
-     * 
+     *
      * @param Fpdi $pdf The PDF document
      * @param AbstractWatermark $watermark The watermark to apply
      * @param int $pageNo The page number
@@ -219,7 +219,7 @@ class PdfWatermarker
         if (!$this->shouldWatermarkPage($watermark->getPages(), $pageNo)) {
             return;
         }
-        
+
         // Apply the watermark based on its type
         if ($watermark instanceof TextWatermark) {
             $this->applyTextWatermark($pdf, $watermark, $size);
@@ -230,7 +230,7 @@ class PdfWatermarker
 
     /**
      * Apply a text watermark to the current page
-     * 
+     *
      * @param Fpdi $pdf The PDF document
      * @param TextWatermark $watermark The text watermark to apply
      * @param array $size The page size information
@@ -239,26 +239,26 @@ class PdfWatermarker
     {
         $config = $watermark->getConfig();
         $text = $watermark->getText();
-        
+
         // Set font
         $pdf->SetFont($config->getFont(), $config->getFontStyle(), $config->getFontSize());
-        
+
         // Get position and text dimensions
         $position = $watermark->getPosition();
         $textWidth = $pdf->GetStringWidth($text);
         $fontSize = $config->getFontSize();
         $padding = $config->getPadding();
-        
+
         // Calculate rectangle dimensions - consistent for all positions
         $rectWidth = $textWidth + (2 * $padding);
         $rectHeight = $fontSize * 0.6; // Further reduced height while still containing the text
-        
+
         // Initialize rectangle and text positions
         $rectX = 0;
         $rectY = 0;
         $textX = 0;
         $textY = 0;
-        
+
         // Calculate positions based on alignment
         // Horizontal positioning
         if (strpos($position, 'left') !== false) {
@@ -274,7 +274,7 @@ class PdfWatermarker
             $rectX = ($size['width'] - $rectWidth) / 2;
             $textX = $rectX + $padding; // Text centered in rectangle horizontally
         }
-        
+
         // Vertical positioning
         if (strpos($position, 'top') !== false) {
             // Top alignment - stick to top border
@@ -292,17 +292,17 @@ class PdfWatermarker
             $rectY = ($size['height'] - $rectHeight) / 2;
             $textY = $rectY + ($padding * 0.3);
         }
-        
+
         // Apply rotation if needed
         if ($watermark->getAngle() != 0) {
             $pdf->StartTransform();
             // Rotate around the center of the rectangle
             $pdf->Rotate($watermark->getAngle(), $rectX + ($rectWidth / 2), $rectY + ($rectHeight / 2));
         }
-        
+
         // Get background color and opacity
         $bgOpacity = $config->getBackgroundOpacity();
-        
+
         // Draw background if opacity is greater than 0
         if ($bgOpacity > 0) {
             // Convert hex background color to RGB
@@ -310,13 +310,13 @@ class PdfWatermarker
             $r = hexdec(substr($bgColorHex, 0, 2));
             $g = hexdec(substr($bgColorHex, 2, 2));
             $b = hexdec(substr($bgColorHex, 4, 2));
-            
+
             // Set background color
             $pdf->SetFillColor($r, $g, $b);
-            
+
             // Set background opacity
             $this->setOpacity($pdf, $bgOpacity);
-            
+
             // Draw background rectangle - consistent for all positions
             $pdf->Rect(
                 $rectX,
@@ -326,15 +326,15 @@ class PdfWatermarker
                 'F'
             );
         }
-        
+
         // Set text color and opacity
         $textColor = $config->getTextColor();
         $pdf->SetTextColor($textColor[0], $textColor[1], $textColor[2]);
         $this->setOpacity($pdf, $config->getTextOpacity());
-        
+
         // Draw text - centered in the rectangle
         $pdf->Text($textX, $textY, $text);
-        
+
         // Reset transformation
         if ($watermark->getAngle() != 0) {
             $pdf->StopTransform();
@@ -343,7 +343,7 @@ class PdfWatermarker
 
     /**
      * Apply an image watermark to the current page
-     * 
+     *
      * @param Fpdi $pdf The PDF document
      * @param ImageWatermark $watermark The image watermark to apply
      * @param array $size The page size information
@@ -352,15 +352,15 @@ class PdfWatermarker
     {
         $config = $watermark->getConfig();
         $imagePath = $config->getImagePath();
-        
+
         // Get image dimensions
         list($imgWidth, $imgHeight) = getimagesize($imagePath);
-        
+
         // Apply scaling
         $scale = $config->getScale();
         $imgWidth *= $scale;
         $imgHeight *= $scale;
-        
+
         // Calculate position
         list($x, $y) = $this->calculatePosition(
             $watermark->getPosition(),
@@ -368,32 +368,32 @@ class PdfWatermarker
             $imgWidth,
             $imgHeight
         );
-        
+
         // Apply rotation if needed
         if ($watermark->getAngle() != 0) {
             $pdf->StartTransform();
             $pdf->Rotate($watermark->getAngle(), $x + ($imgWidth / 2), $y - ($imgHeight / 2));
         }
-        
+
         // Set opacity
         $this->setOpacity($pdf, $watermark->getOpacity());
-        
+
         // Adjust y-coordinate based on position
         // In TCPDF, the y-coordinate for Image is the top-left corner
         $position = $watermark->getPosition();
         if (strpos($position, 'bottom') !== false) {
             // For bottom positioning, adjust y to place the image at the bottom
             $y = $y - $imgHeight;
-        } else if (strpos($position, 'top') !== false) {
+        } elseif (strpos($position, 'top') !== false) {
             // For top positioning, no adjustment needed as y already includes height
         } else {
             // For middle positioning, center the image vertically
             $y = $y - $imgHeight;
         }
-        
+
         // Add image
         $pdf->Image($imagePath, $x, $y, $imgWidth, $imgHeight);
-        
+
         // Reset transformation
         if ($watermark->getAngle() != 0) {
             $pdf->StopTransform();
@@ -402,7 +402,7 @@ class PdfWatermarker
 
     /**
      * Set the opacity for the next drawing operation
-     * 
+     *
      * @param Fpdi $pdf The PDF document
      * @param float $opacity The opacity value (0-1)
      */
@@ -410,14 +410,14 @@ class PdfWatermarker
     {
         // Create opacity ExtGState
         $opacityName = sprintf('Opacity%.2F', $opacity * 100);
-        
+
         // TCPDF has a method to set alpha which handles the ExtGState internally
         $pdf->setAlpha($opacity, 'Normal');
     }
 
     /**
      * Calculate the position for a watermark based on its alignment
-     * 
+     *
      * @param string $position Position identifier (e.g., 'center', 'top-left')
      * @param array $pageSize Page dimensions
      * @param float $width Watermark width
@@ -428,7 +428,7 @@ class PdfWatermarker
     {
         $x = 0;
         $y = 0;
-        
+
         // Horizontal position - stick to borders
         if (strpos($position, 'left') !== false) {
             $x = 0; // Left border
@@ -438,7 +438,7 @@ class PdfWatermarker
             // Center
             $x = ($pageSize['width'] - $width) / 2;
         }
-        
+
         // Vertical position - stick to borders
         if (strpos($position, 'top') !== false) {
             $y = 0; // Top border
@@ -452,13 +452,13 @@ class PdfWatermarker
             // Middle
             $y = ($pageSize['height'] + $height) / 2;
         }
-        
+
         return [$x, $y];
     }
 
     /**
      * Check if a page should be watermarked
-     * 
+     *
      * @param array $pages Pages to watermark
      * @param int $pageNo Current page number
      * @return bool True if the page should be watermarked
@@ -468,40 +468,40 @@ class PdfWatermarker
         if (in_array('all', $pages)) {
             return true;
         }
-        
+
         if (in_array('last', $pages) && $pageNo == $this->totalPages) {
             return true;
         }
-        
+
         if (in_array((string) $pageNo, $pages)) {
             return true;
         }
-        
+
         foreach ($pages as $page) {
             if (is_string($page) && strpos($page, '-') !== false) {
                 list($start, $end) = explode('-', $page, 2);
-                
+
                 if ($end === 'last') {
                     $end = $this->totalPages;
                 }
-                
+
                 if (is_numeric($start) && is_numeric($end)) {
                     $startPage = (int) $start;
                     $endPage = (int) $end;
-                    
+
                     if ($pageNo >= $startPage && $pageNo <= $endPage) {
                         return true;
                     }
                 }
             }
         }
-        
+
         return false;
     }
 
     /**
      * Clean up a temporary directory and all its contents
-     * 
+     *
      * @param string $dir Path to the directory
      */
     private function cleanupTempDir(string $dir): void
@@ -509,19 +509,19 @@ class PdfWatermarker
         if (!is_dir($dir)) {
             return;
         }
-        
+
         $files = array_diff(scandir($dir), ['.', '..']);
-        
+
         foreach ($files as $file) {
             $path = $dir . '/' . $file;
-            
+
             if (is_dir($path)) {
                 $this->cleanupTempDir($path);
             } else {
                 unlink($path);
             }
         }
-        
+
         rmdir($dir);
     }
 }

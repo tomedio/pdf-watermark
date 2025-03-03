@@ -22,7 +22,7 @@ abstract class AbstractWatermark
 
     /**
      * Constructor
-     * 
+     *
      * @param WatermarkConfigInterface $config Watermark configuration
      */
     public function __construct(WatermarkConfigInterface $config)

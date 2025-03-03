@@ -22,7 +22,7 @@ class ImageWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the scale of the image
-     * 
+     *
      * @param float $scale Scale factor (1.0 = original size)
      * @return $this
      */
@@ -40,7 +40,7 @@ class ImageWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the width of the image (height will be calculated to maintain aspect ratio)
-     * 
+     *
      * @param int $width Width in points
      * @return $this
      */
@@ -58,7 +58,7 @@ class ImageWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the height of the image (width will be calculated to maintain aspect ratio)
-     * 
+     *
      * @param int $height Height in points
      * @return $this
      */

@@ -67,7 +67,7 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
 
     /**
      * Set pages to apply the watermark to
-     * 
+     *
      * @param array|string|int $pages Can be:
      *                           - 'all' for all pages
      *                           - 'last' for the last page

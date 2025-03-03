@@ -10,7 +10,7 @@ class TextWatermark extends AbstractWatermark
 {
     /**
      * Constructor
-     * 
+     *
      * @param TextWatermarkConfig $config Text watermark configuration
      */
     public function __construct(TextWatermarkConfig $config)
@@ -28,19 +28,19 @@ class TextWatermark extends AbstractWatermark
 
     /**
      * Get the text content of the watermark
-     * 
+     *
      * @return string
      */
     public function getText(): string
     {
         $text = $this->getConfig()->getText();
-        
+
         // Handle page number placeholder
         if (strpos($text, '%d') !== false) {
             // This will be handled in the PdfWatermarker class
             return $text;
         }
-        
+
         return $text;
     }
 }

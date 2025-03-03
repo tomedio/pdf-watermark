@@ -16,7 +16,7 @@ class PdfWatermarkerFactory
 
     /**
      * Constructor
-     * 
+     *
      * @param string|null $pdftk Path to the pdftk executable (defaults to 'pdftk')
      * @param string|null $tempDir Path to the temporary directory (defaults to system temp directory)
      */
@@ -28,7 +28,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a new PdfWatermarker instance
-     * 
+     *
      * @return PdfWatermarker
      */
     public function create(): PdfWatermarker
@@ -38,7 +38,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a new text watermark configuration
-     * 
+     *
      * @param string $text Text to use for the watermark
      * @return TextWatermarkConfig
      */
@@ -49,7 +49,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a new image watermark configuration
-     * 
+     *
      * @param string $imagePath Path to the image file
      * @return ImageWatermarkConfig
      */
@@ -60,7 +60,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a new text watermark
-     * 
+     *
      * @param TextWatermarkConfig $config Text watermark configuration
      * @return TextWatermark
      */
@@ -71,7 +71,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a new image watermark
-     * 
+     *
      * @param ImageWatermarkConfig $config Image watermark configuration
      * @return ImageWatermark
      */
@@ -82,7 +82,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a PdfWatermarker with a text watermark
-     * 
+     *
      * @param TextWatermarkConfig $config Text watermark configuration
      * @return PdfWatermarker
      */
@@ -96,7 +96,7 @@ class PdfWatermarkerFactory
 
     /**
      * Create a PdfWatermarker with an image watermark
-     * 
+     *
      * @param ImageWatermarkConfig $config Image watermark configuration
      * @return PdfWatermarker
      */

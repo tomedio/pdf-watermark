@@ -37,7 +37,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the text color in RGB format
-     * 
+     *
      * @param int $r Red component (0-255)
      * @param int $g Green component (0-255)
      * @param int $b Blue component (0-255)
@@ -66,7 +66,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the background color in RGB format
-     * 
+     *
      * @param int $r Red component (0-255)
      * @param int $g Green component (0-255)
      * @param int $b Blue component (0-255)
@@ -145,7 +145,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Get the text color of the watermark as RGB array
-     * 
+     *
      * @return array [r, g, b] values (0-255)
      */
     public function getTextColor(): array
@@ -159,7 +159,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
                 hexdec(substr($hex, 4, 2))  // b
             ];
         }
-        
+
         // Default to black if invalid
         return [0, 0, 0];
     }
@@ -223,7 +223,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Validate RGB values
-     * 
+     *
      * @param int $r Red component (0-255)
      * @param int $g Green component (0-255)
      * @param int $b Blue component (0-255)

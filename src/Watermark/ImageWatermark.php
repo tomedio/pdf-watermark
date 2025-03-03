@@ -10,7 +10,7 @@ class ImageWatermark extends AbstractWatermark
 {
     /**
      * Constructor
-     * 
+     *
      * @param ImageWatermarkConfig $config Image watermark configuration
      */
     public function __construct(ImageWatermarkConfig $config)
