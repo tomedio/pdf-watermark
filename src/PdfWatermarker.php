@@ -251,7 +251,7 @@ class PdfWatermarker
         
         // Calculate rectangle dimensions - consistent for all positions
         $rectWidth = $textWidth + (2 * $padding);
-        $rectHeight = $fontSize; // Increased height to better contain the text
+        $rectHeight = $fontSize * 0.6; // Further reduced height while still containing the text
         
         // Initialize rectangle and text positions
         $rectX = 0;
@@ -282,15 +282,15 @@ class PdfWatermarker
             // For vertical centering, we need to account for the font's baseline
             // TCPDF's Text() method positions text at the baseline, not at the top
             // The formula below places the text in the middle of the rectangle
-            $textY = $rectY - ($rectHeight / 2) + ($fontSize );
+            $textY = $rectY + ($padding * 0.3);
         } elseif (strpos($position, 'bottom') !== false) {
             // Bottom alignment - stick to bottom border
             $rectY = $size['height'] - $rectHeight;
-            $textY = $rectY - ($rectHeight / 2) + ($fontSize );
+            $textY = $rectY + ($padding * 0.3);
         } else {
             // Middle alignment
             $rectY = ($size['height'] - $rectHeight) / 2;
-            $textY = $rectY - ($rectHeight / 2) + ($fontSize );
+            $textY = $rectY + ($padding * 0.3);
         }
         
         // Apply rotation if needed
@@ -388,7 +388,7 @@ class PdfWatermarker
             // For top positioning, no adjustment needed as y already includes height
         } else {
             // For middle positioning, center the image vertically
-            $y = $y - $imgHeight / 2;
+            $y = $y - $imgHeight;
         }
         
         // Add image

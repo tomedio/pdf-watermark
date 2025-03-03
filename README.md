@@ -6,15 +6,17 @@ A PHP library for adding text and image watermarks to PDF files using FPDI.
 
 - Add text watermarks with customizable:
   - Font size, color, and opacity
+  - Font style (bold, italic, etc.)
   - Background color and opacity
   - Rotation angle
   - Position (top-left, center, bottom-right, etc.)
   - Pages to apply the watermark to (specific pages, ranges, last page, all pages)
+  - Page number placeholder support (%d)
 
 - Add image watermarks with customizable:
   - Opacity
   - Rotation angle
-  - Scaling
+  - Scaling or explicit dimensions
   - Position
   - Pages to apply the watermark to
 
@@ -28,6 +30,7 @@ A PHP library for adding text and image watermarks to PDF files using FPDI.
 
 - PHP 8.1 or higher
 - pdftk (optional, but recommended for handling compressed PDFs with versions higher than 1.4)
+- Ghostscript (optional, used for testing)
 
 ## Installation
 
@@ -250,6 +253,7 @@ Configuration class for text watermarks.
 - `setBackgroundOpacity(float $opacity): self`: Set the background opacity (0.0 to 1.0)
 - `setPadding(int $padding): self`: Set the padding around the text in points
 - `setFontName(string $fontName): self`: Set the font name
+- `setFontStyle(string $fontStyle): self`: Set the font style (e.g., 'B' for bold, 'I' for italic, 'BI' for bold italic)
 
 ### ImageWatermarkConfig
 
@@ -277,9 +281,98 @@ This library uses FPDI to process PDF files, which has a limitation with compres
 
 This approach allows the library to work with a wide range of PDF files, including those with higher versions, without requiring the paid version of FPDI.
 
+## Advanced Usage
+
+### Using Page Number Placeholder
+
+You can include the page number in your text watermark using the `%d` placeholder:
+
+```php
+// Create a text watermark with page number
+$textConfig = $factory->createTextWatermarkConfig('Page %d');
+$textConfig
+    ->setPosition(AbstractWatermark::POSITION_BOTTOM_CENTER)
+    ->setOpacity(0.5)
+    ->setFontSize(10)
+    ->setTextColor(0, 0, 0);
+
+$watermarker = $factory->createWithTextWatermark($textConfig);
+$watermarker->apply('input.pdf', 'output.pdf');
+```
+
+### Setting Font Style
+
+You can set the font style for text watermarks:
+
+```php
+$textConfig = $factory->createTextWatermarkConfig('CONFIDENTIAL');
+$textConfig
+    ->setFontName('Helvetica')
+    ->setFontStyle('B')  // B for bold, I for italic, BI for bold italic
+    ->setFontSize(24);
+```
+
+### Setting Explicit Dimensions for Image Watermarks
+
+Instead of scaling, you can set explicit dimensions for image watermarks:
+
+```php
+$imageConfig = $factory->createImageWatermarkConfig('logo.png');
+$imageConfig
+    ->setPosition(AbstractWatermark::POSITION_BOTTOM_RIGHT)
+    ->setWidth(200);  // Set width to 200 points, height will be calculated automatically
+
+// Or set height instead
+$imageConfig
+    ->setHeight(100);  // Set height to 100 points, width will be calculated automatically
+```
+
 ## Examples
 
-See the `examples` directory for more examples.
+The library includes several example scripts in the `examples` directory:
+
+- `test_positions.php`: Demonstrates all available positioning options for both text and image watermarks
+
+To run an example, use the provided Makefile command:
+
+```bash
+make example
+```
+
+Or run a specific example directly:
+
+```bash
+php examples/test_positions.php
+```
+
+## Development
+
+### Available Makefile Commands
+
+The library includes a Makefile with several useful commands:
+
+```bash
+# Install dependencies
+make install
+
+# Run tests
+make test
+
+# Check coding standards
+make cs
+
+# Fix coding standards
+make cs-fix
+
+# Install Ghostscript (Ubuntu/Debian)
+make install-gs-debian
+
+# Install Ghostscript (macOS)
+make install-gs-mac
+
+# Run example
+make example
+```
 
 ## License
 
