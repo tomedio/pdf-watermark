@@ -176,7 +176,13 @@ $config->setPages('2-last');  // From page 2 to the last page
 // Apply to the last page only
 $config->setPages('last');
 
-// Apply to multiple specific pages or ranges
+// Apply to multiple specific pages or ranges using a comma-separated string
+$config->setPages('1-2,4');  // Pages 1, 2, and 4
+
+// Apply to a combination of specific pages, ranges, and special values
+$config->setPages('1,3-5,last');  // Pages 1, 3, 4, 5, and the last page
+
+// Apply to multiple specific pages or ranges using an array
 $config->setPages([1, '3-5', 'last']);
 ```
 

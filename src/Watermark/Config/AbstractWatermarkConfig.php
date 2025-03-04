@@ -74,13 +74,21 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
      *                           - A specific page number (e.g., 1)
      *                           - A range (e.g., '2-5')
      *                           - A range to the end (e.g., '2-last')
+     *                           - A comma-separated list of any of the above (e.g., '1-2,4')
      *                           - An array of any of the above
      * @return $this
      */
     public function setPages(array|string|int $pages): self
     {
-        if (is_string($pages) || is_int($pages)) {
-            $pages = [$pages];
+        if (is_int($pages)) {
+            $pages = [(string)$pages];
+        } elseif (is_string($pages)) {
+            // Handle comma-separated values
+            if (strpos($pages, ',') !== false) {
+                $pages = array_map('trim', explode(',', $pages));
+            } else {
+                $pages = [$pages];
+            }
         }
 
         $this->pages = $pages;

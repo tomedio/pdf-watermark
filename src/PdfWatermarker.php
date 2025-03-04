@@ -98,9 +98,17 @@ class PdfWatermarker
 
         // Create a new PDF document
         $pdf = new Fpdi();
-
+        
         // Disable auto page break to prevent unexpected new pages
         $pdf->SetAutoPageBreak(false);
+        
+        // Disable default border drawing
+        $pdf->SetDrawColor(255, 255, 255, 0); // Transparent
+        $pdf->SetLineWidth(0); // Set line width to 0
+        
+        // Disable headers and footers
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
 
         // Set the source file
         $pdf->setSourceFile($inputFile);
@@ -120,8 +128,8 @@ class PdfWatermarker
                 $pdf->AddPage('P', [$size['width'], $size['height']]);
             }
 
-            // Use the imported page as a template
-            $pdf->useTemplate($templateId);
+            // Use the imported page as a template - specify position explicitly
+            $pdf->useTemplate($templateId, 0, 0, $size['width'], $size['height']);
 
             // Apply watermarks to this page
             foreach ($this->watermarks as $watermark) {
@@ -245,7 +253,7 @@ class PdfWatermarker
 
         // Get position and text dimensions
         $position = $watermark->getPosition();
-        $textWidth = ceil($pdf->GetStringWidth($text)) + 2;
+        $textWidth = $watermark->getAngle() != 0 ? $pdf->GetStringWidth($text) : ceil($pdf->GetStringWidth($text)) + 2;
         $fontSize = $config->getFontSize();
 
         // Calculate rectangle dimensions - consistent for all positions
@@ -372,7 +380,8 @@ class PdfWatermarker
             $scaleHeight = $pageHeight / $imgHeight;
             
             // Use the smaller scale factor to ensure image fits within page
-            $scaleFactor = min($scaleWidth, $scaleHeight);
+            // Round down to 2 decimal places
+            $scaleFactor = floor(min($scaleWidth, $scaleHeight) * 100) / 100;
             
             // Apply the scale factor to maintain aspect ratio
             $imgWidth *= $scaleFactor;
@@ -410,7 +419,7 @@ class PdfWatermarker
         }
 
         // Add image
-        $pdf->Image($imagePath, $x, $y, $imgWidth, $imgHeight);
+        @$pdf->Image($imagePath, $x, $y, $imgWidth, $imgHeight);
 
         // Reset transformation
         if ($watermark->getAngle() != 0) {
