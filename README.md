@@ -19,6 +19,7 @@ A PHP library for adding text and image watermarks to PDF files using FPDI.
   - Scaling or explicit dimensions
   - Position
   - Pages to apply the watermark to
+  - Automatic scaling to fit page boundaries
 
 - Works with compressed PDF files and PDFs with versions higher than 1.4
 - Recognizes page sizes and orientations
@@ -29,8 +30,7 @@ A PHP library for adding text and image watermarks to PDF files using FPDI.
 ## Requirements
 
 - PHP 8.1 or higher
-- pdftk (optional, but recommended for handling compressed PDFs with versions higher than 1.4)
-- Ghostscript (optional, used for testing)
+- pdftk (recommended for handling compressed PDFs with versions higher than 1.4)
 
 ## Installation
 
@@ -115,6 +115,8 @@ $watermarker = $factory->createWithImageWatermark($imageConfig);
 // Apply the watermark
 $watermarker->apply('input.pdf', 'output.pdf');
 ```
+
+Note: If the image watermark exceeds the page size, it will be automatically scaled down proportionally to fit within the page boundaries while maintaining its aspect ratio.
 
 ### Adding Multiple Watermarks
 
@@ -273,9 +275,9 @@ Configuration class for image watermarks.
 - `setOpacity(float $opacity): self`: Set the opacity of the watermark (0.0 to 1.0)
 - `setAngle(float $angle): self`: Set the rotation angle of the watermark in degrees
 - `setPages(array|string $pages): self`: Set pages to apply the watermark to
-- `setScale(float $scale): self`: Set the scale of the image (1.0 = original size)
-- `setWidth(int $width): self`: Set the width of the image (height will be calculated to maintain aspect ratio)
-- `setHeight(int $height): self`: Set the height of the image (width will be calculated to maintain aspect ratio)
+- `setScale(float $scale): self`: Set the scale of the image (1.0 = original size). If the scaled image exceeds the page size, it will be automatically scaled down proportionally to fit within the page boundaries.
+- `setWidth(int $width): self`: Set the width of the image (height will be calculated to maintain aspect ratio). If the resulting image exceeds the page size, it will be automatically scaled down proportionally to fit within the page boundaries.
+- `setHeight(int $height): self`: Set the height of the image (width will be calculated to maintain aspect ratio). If the resulting image exceeds the page size, it will be automatically scaled down proportionally to fit within the page boundaries.
 
 ## PDF Version Compatibility
 
@@ -373,6 +375,8 @@ $imageConfig
     ->setHeight(100);  // Set height to 100 points, width will be calculated automatically
 ```
 
+Note: If the resulting image dimensions exceed the page size, the image will be automatically scaled down proportionally to fit within the page boundaries while maintaining its aspect ratio.
+
 
 ## Development
 
@@ -392,12 +396,6 @@ make cs
 
 # Fix coding standards
 make cs-fix
-
-# Install Ghostscript (Ubuntu/Debian)
-make install-gs-debian
-
-# Install Ghostscript (macOS)
-make install-gs-mac
 
 # Run example
 make example

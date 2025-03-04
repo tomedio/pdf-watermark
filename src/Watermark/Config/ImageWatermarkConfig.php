@@ -22,6 +22,9 @@ class ImageWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the scale of the image
+     * 
+     * Note: If the scaled image exceeds the page size, it will be automatically
+     * scaled down proportionally to fit within the page boundaries.
      *
      * @param float $scale Scale factor (1.0 = original size)
      * @return $this
@@ -40,6 +43,9 @@ class ImageWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the width of the image (height will be calculated to maintain aspect ratio)
+     * 
+     * Note: If the resulting image exceeds the page size, it will be automatically
+     * scaled down proportionally to fit within the page boundaries.
      *
      * @param int $width Width in points
      * @return $this
@@ -58,6 +64,9 @@ class ImageWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Set the height of the image (width will be calculated to maintain aspect ratio)
+     * 
+     * Note: If the resulting image exceeds the page size, it will be automatically
+     * scaled down proportionally to fit within the page boundaries.
      *
      * @param int $height Height in points
      * @return $this

@@ -358,9 +358,26 @@ class PdfWatermarker
         list($imgWidth, $imgHeight) = getimagesize($imagePath);
 
         // Apply scaling
-        $scale = $config->getScale();
+        $scale = $config->getScale() ?? 1.0;
         $imgWidth *= $scale;
         $imgHeight *= $scale;
+        
+        // Check if image exceeds page size and scale down if necessary
+        $pageWidth = $size['width'];
+        $pageHeight = $size['height'];
+        
+        if ($imgWidth > $pageWidth || $imgHeight > $pageHeight) {
+            // Calculate scale factors for width and height
+            $scaleWidth = $pageWidth / $imgWidth;
+            $scaleHeight = $pageHeight / $imgHeight;
+            
+            // Use the smaller scale factor to ensure image fits within page
+            $scaleFactor = min($scaleWidth, $scaleHeight);
+            
+            // Apply the scale factor to maintain aspect ratio
+            $imgWidth *= $scaleFactor;
+            $imgHeight *= $scaleFactor;
+        }
 
         // Calculate position
         list($x, $y) = $this->calculatePosition(
