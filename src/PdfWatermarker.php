@@ -245,13 +245,16 @@ class PdfWatermarker
 
         // Get position and text dimensions
         $position = $watermark->getPosition();
-        $textWidth = $pdf->GetStringWidth($text);
+        $textWidth = ceil($pdf->GetStringWidth($text)) + 2;
         $fontSize = $config->getFontSize();
-        $padding = $config->getPadding();
 
         // Calculate rectangle dimensions - consistent for all positions
-        $rectWidth = $textWidth + (2 * $padding);
-        $rectHeight = $fontSize * 0.6; // Further reduced height while still containing the text
+        $rectWidth = $textWidth + 2.0;
+        
+        // Calculate font height based on TCPDF's font metrics
+        $fontHeight = $pdf->getFontSize();
+        // Set rectangle height to match text height
+        $rectHeight = $fontHeight + 2.0;
 
         // Initialize rectangle and text positions
         $rectX = 0;
@@ -264,15 +267,15 @@ class PdfWatermarker
         if (strpos($position, 'left') !== false) {
             // Left alignment - stick to left border
             $rectX = 0;
-            $textX = $rectX + $padding; // Text centered in rectangle horizontally
+            $textX = $rectX + 2.0; // Text aligned with rectangle
         } elseif (strpos($position, 'right') !== false) {
             // Right alignment - stick to right border
             $rectX = $size['width'] - $rectWidth;
-            $textX = $rectX + $padding; // Text centered in rectangle horizontally
+            $textX = $rectX + 2.0; // Text aligned with rectangle
         } else {
             // Center alignment
             $rectX = ($size['width'] - $rectWidth) / 2;
-            $textX = $rectX + $padding; // Text centered in rectangle horizontally
+            $textX = $rectX + 2.0; // Text aligned with rectangle
         }
 
         // Vertical positioning
@@ -280,17 +283,15 @@ class PdfWatermarker
             // Top alignment - stick to top border
             $rectY = 0;
             // For vertical centering, we need to account for the font's baseline
-            // TCPDF's Text() method positions text at the baseline, not at the top
-            // The formula below places the text in the middle of the rectangle
-            $textY = $rectY + ($padding * 0.3);
+            $textY = $rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05);
         } elseif (strpos($position, 'bottom') !== false) {
             // Bottom alignment - stick to bottom border
             $rectY = $size['height'] - $rectHeight;
-            $textY = $rectY + ($padding * 0.3);
+            $textY = $rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05);
         } else {
             // Middle alignment
             $rectY = ($size['height'] - $rectHeight) / 2;
-            $textY = $rectY + ($padding * 0.3);
+            $textY = $rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05);
         }
 
         // Apply rotation if needed

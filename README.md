@@ -239,6 +239,14 @@ The base class for all watermarks.
 
 Configuration class for text watermarks.
 
+#### Constants
+
+- `FONT_STYLE_REGULAR`: Regular font style (no formatting)
+- `FONT_STYLE_BOLD`: Bold font style
+- `FONT_STYLE_ITALIC`: Italic font style
+- `FONT_STYLE_UNDERLINE`: Underlined font style
+- `FONT_STYLE_STRIKETHROUGH`: Strikethrough font style
+
 #### Methods
 
 - `__construct(string $text)`: Constructor
@@ -251,9 +259,8 @@ Configuration class for text watermarks.
 - `setTextOpacity(float $opacity): self`: Set the text opacity (0.0 to 1.0)
 - `setBackgroundColor(int $r, int $g, int $b): self`: Set the background color in RGB format (0-255)
 - `setBackgroundOpacity(float $opacity): self`: Set the background opacity (0.0 to 1.0)
-- `setPadding(int $padding): self`: Set the padding around the text in points
 - `setFontName(string $fontName): self`: Set the font name
-- `setFontStyle(string $fontStyle): self`: Set the font style (e.g., 'B' for bold, 'I' for italic, 'BI' for bold italic)
+- `setFontStyle(int $fontStyle): self`: Set the font style using constants (e.g., `TextWatermarkConfig::FONT_STYLE_BOLD`, `TextWatermarkConfig::FONT_STYLE_ITALIC`)
 
 ### ImageWatermarkConfig
 
@@ -300,16 +307,55 @@ $watermarker = $factory->createWithTextWatermark($textConfig);
 $watermarker->apply('input.pdf', 'output.pdf');
 ```
 
-### Setting Font Style
+### Setting Font Name and Style
 
-You can set the font style for text watermarks:
+#### Font Name
+
+You can set the font name for text watermarks using predefined constants or custom font names:
 
 ```php
+use PdfWatermark\Watermark\Config\TextWatermarkConfig;
+
 $textConfig = $factory->createTextWatermarkConfig('CONFIDENTIAL');
+
+// Using predefined font constants
+$textConfig->setFontName(TextWatermarkConfig::FONT_HELVETICA);
+$textConfig->setFontName(TextWatermarkConfig::FONT_COURIER);
+$textConfig->setFontName(TextWatermarkConfig::FONT_TIMES);
+$textConfig->setFontName(TextWatermarkConfig::FONT_SYMBOL);
+
+// Or using a string directly
+$textConfig->setFontName('Helvetica');
+
+// You can also use custom fonts if they are available in your TCPDF installation
+$textConfig->setFontName('YourCustomFont');
+```
+
+#### Font Style
+
+You can set the font style for text watermarks using constants:
+
+```php
 $textConfig
-    ->setFontName('Helvetica')
-    ->setFontStyle('B')  // B for bold, I for italic, BI for bold italic
+    ->setFontName(TextWatermarkConfig::FONT_HELVETICA)
+    ->setFontStyle(TextWatermarkConfig::FONT_STYLE_BOLD)  // Use constants for font styles
     ->setFontSize(24);
+```
+
+You can also combine multiple font styles using the bitwise OR operator:
+
+```php
+// Apply both bold and italic styles
+$textConfig->setFontStyle(
+    TextWatermarkConfig::FONT_STYLE_BOLD | TextWatermarkConfig::FONT_STYLE_ITALIC
+);
+
+// Apply bold, underline, and strikethrough
+$textConfig->setFontStyle(
+    TextWatermarkConfig::FONT_STYLE_BOLD | 
+    TextWatermarkConfig::FONT_STYLE_UNDERLINE | 
+    TextWatermarkConfig::FONT_STYLE_STRIKETHROUGH
+);
 ```
 
 ### Setting Explicit Dimensions for Image Watermarks
@@ -327,23 +373,6 @@ $imageConfig
     ->setHeight(100);  // Set height to 100 points, width will be calculated automatically
 ```
 
-## Examples
-
-The library includes several example scripts in the `examples` directory:
-
-- `test_positions.php`: Demonstrates all available positioning options for both text and image watermarks
-
-To run an example, use the provided Makefile command:
-
-```bash
-make example
-```
-
-Or run a specific example directly:
-
-```bash
-php examples/test_positions.php
-```
 
 ## Development
 

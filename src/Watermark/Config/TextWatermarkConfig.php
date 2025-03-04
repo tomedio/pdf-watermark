@@ -6,15 +6,31 @@ namespace PdfWatermark\Watermark\Config;
 
 class TextWatermarkConfig extends AbstractWatermarkConfig
 {
+    /**
+     * Font style constants
+     */
+    public const FONT_STYLE_REGULAR = 0;
+    public const FONT_STYLE_BOLD = 1;
+    public const FONT_STYLE_ITALIC = 2;
+    public const FONT_STYLE_UNDERLINE = 4;
+    public const FONT_STYLE_STRIKETHROUGH = 8;
+    
+    /**
+     * Native font constants
+     */
+    public const FONT_COURIER = 'Courier';
+    public const FONT_HELVETICA = 'Helvetica';
+    public const FONT_TIMES = 'Times';
+    public const FONT_SYMBOL = 'Symbol';
+    
     private string $text;
-    private int $fontSize = 24;
+    private int $fontSize = 24; // Font size in pixels (will be converted to points internally)
     private string $textColor = '000000'; // Hex color
     private float $textOpacity = 1.0;
     private string $backgroundColor = 'ffffff'; // Hex color
     private float $backgroundOpacity = 0.0; // Default to transparent background
-    private int $padding = 5;
     private string $fontName = 'Helvetica';
-    private string $fontStyle = '';
+    private int $fontStyle = self::FONT_STYLE_REGULAR;
 
     public function __construct(string $text)
     {
@@ -22,7 +38,7 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
-     * @param int $fontSize Font size in points
+     * @param int $fontSize Font size in pixels
      * @return $this
      */
     public function setFontSize(int $fontSize): self
@@ -94,20 +110,16 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
-     * @param int $padding Padding in points
-     * @return $this
-     */
-    public function setPadding(int $padding): self
-    {
-        if ($padding < 0) {
-            throw new \InvalidArgumentException('Padding must be greater than or equal to 0');
-        }
-
-        $this->padding = $padding;
-        return $this;
-    }
-
-    /**
+     * Set the font name to use for the watermark
+     * 
+     * You can use one of the predefined constants:
+     * - TextWatermarkConfig::FONT_COURIER
+     * - TextWatermarkConfig::FONT_HELVETICA
+     * - TextWatermarkConfig::FONT_TIMES
+     * - TextWatermarkConfig::FONT_SYMBOL
+     * 
+     * Or specify a custom font name that is available in your TCPDF installation.
+     * 
      * @param string $fontName Name of the font to use
      * @return $this
      */
@@ -118,11 +130,24 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
-     * @param string $fontStyle Font style (e.g., 'B' for bold, 'I' for italic)
+     * Set the font style
+     * 
+     * @param int $fontStyle Font style (use TextWatermarkConfig::FONT_STYLE_* constants)
      * @return $this
+     * @throws \InvalidArgumentException If an invalid font style is provided
      */
-    public function setFontStyle(string $fontStyle): self
+    public function setFontStyle(int $fontStyle): self
     {
+        // Validate that only valid bits are set
+        $validBits = self::FONT_STYLE_BOLD | self::FONT_STYLE_ITALIC | 
+                     self::FONT_STYLE_UNDERLINE | self::FONT_STYLE_STRIKETHROUGH;
+        
+        if (($fontStyle & ~$validBits) !== 0) {
+            throw new \InvalidArgumentException(
+                'Invalid font style. Use TextWatermarkConfig::FONT_STYLE_* constants.'
+            );
+        }
+        
         $this->fontStyle = $fontStyle;
         return $this;
     }
@@ -189,14 +214,6 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
     }
 
     /**
-     * Get the padding of the watermark
-     */
-    public function getPadding(): int
-    {
-        return $this->padding;
-    }
-
-    /**
      * Get the font name of the watermark
      */
     public function getFontName(): string
@@ -206,10 +223,30 @@ class TextWatermarkConfig extends AbstractWatermarkConfig
 
     /**
      * Get the font style of the watermark
+     * 
+     * @return string Font style string for TCPDF
      */
     public function getFontStyle(): string
     {
-        return $this->fontStyle;
+        $style = '';
+        
+        if ($this->fontStyle & self::FONT_STYLE_BOLD) {
+            $style .= 'B';
+        }
+        
+        if ($this->fontStyle & self::FONT_STYLE_ITALIC) {
+            $style .= 'I';
+        }
+        
+        if ($this->fontStyle & self::FONT_STYLE_UNDERLINE) {
+            $style .= 'U';
+        }
+        
+        if ($this->fontStyle & self::FONT_STYLE_STRIKETHROUGH) {
+            $style .= 'D';
+        }
+        
+        return $style;
     }
 
     /**
