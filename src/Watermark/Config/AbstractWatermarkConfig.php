@@ -16,6 +16,7 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
     /**
      * @param string $position One of the POSITION_* constants
      * @return $this
+     * @throws \InvalidArgumentException If position is not valid or if angle is not 0 and position is not center
      */
     public function setPosition(string $position): self
     {
@@ -34,6 +35,12 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
         if (!in_array($position, $validPositions)) {
             throw new \InvalidArgumentException(
                 sprintf('Invalid position "%s". Valid positions are: %s', $position, implode(', ', $validPositions))
+            );
+        }
+
+        if ($this->angle != 0 && $position !== AbstractWatermark::POSITION_CENTER) {
+            throw new \InvalidArgumentException(
+                'Cannot set position other than center when angle is not 0'
             );
         }
 
@@ -58,9 +65,16 @@ abstract class AbstractWatermarkConfig implements WatermarkConfigInterface
     /**
      * @param float $angle Rotation angle in degrees
      * @return $this
+     * @throws \InvalidArgumentException If angle is not 0 and position is not center
      */
     public function setAngle(float $angle): self
     {
+        if ($angle != 0 && $this->position !== AbstractWatermark::POSITION_CENTER) {
+            throw new \InvalidArgumentException(
+                'Rotation angle can only be used with the center position'
+            );
+        }
+        
         $this->angle = $angle;
         return $this;
     }

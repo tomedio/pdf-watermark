@@ -8,14 +8,14 @@ A PHP library for adding text and image watermarks to PDF files using FPDI.
   - Font size, color, and opacity
   - Font style (bold, italic, etc.)
   - Background color and opacity
-  - Rotation angle
+  - Rotation angle (only available with center position)
   - Position (top-left, center, bottom-right, etc.)
   - Pages to apply the watermark to (specific pages, ranges, last page, all pages)
   - Page number placeholder support (%d)
 
 - Add image watermarks with customizable:
   - Opacity
-  - Rotation angle
+  - Rotation angle (only available with center position)
   - Scaling or explicit dimensions
   - Position
   - Pages to apply the watermark to
@@ -260,7 +260,7 @@ Configuration class for text watermarks.
 - `__construct(string $text)`: Constructor
 - `setPosition(string $position): self`: Set the position of the watermark
 - `setOpacity(float $opacity): self`: Set the opacity of the watermark (0.0 to 1.0)
-- `setAngle(float $angle): self`: Set the rotation angle of the watermark in degrees
+- `setAngle(float $angle): self`: Set the rotation angle of the watermark in degrees (only works with center position)
 - `setPages(array|string $pages): self`: Set pages to apply the watermark to
 - `setFontSize(int $fontSize): self`: Set the font size in points
 - `setTextColor(int $r, int $g, int $b): self`: Set the text color in RGB format (0-255)
@@ -279,7 +279,7 @@ Configuration class for image watermarks.
 - `__construct(string $imagePath)`: Constructor
 - `setPosition(string $position): self`: Set the position of the watermark
 - `setOpacity(float $opacity): self`: Set the opacity of the watermark (0.0 to 1.0)
-- `setAngle(float $angle): self`: Set the rotation angle of the watermark in degrees
+- `setAngle(float $angle): self`: Set the rotation angle of the watermark in degrees (only works with center position)
 - `setPages(array|string $pages): self`: Set pages to apply the watermark to
 - `setScale(float $scale): self`: Set the scale of the image (1.0 = original size). If the scaled image exceeds the page size, it will be automatically scaled down proportionally to fit within the page boundaries.
 - `setWidth(int $width): self`: Set the width of the image (height will be calculated to maintain aspect ratio). If the resulting image exceeds the page size, it will be automatically scaled down proportionally to fit within the page boundaries.

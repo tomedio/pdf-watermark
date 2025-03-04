@@ -98,17 +98,19 @@ class PdfWatermarker
 
         // Create a new PDF document
         $pdf = new Fpdi();
-        
+
         // Disable auto page break to prevent unexpected new pages
         $pdf->SetAutoPageBreak(false);
-        
+
         // Disable default border drawing
         $pdf->SetDrawColor(255, 255, 255, 0); // Transparent
         $pdf->SetLineWidth(0); // Set line width to 0
-        
+
         // Disable headers and footers
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
+        $pdf->setHeaderMargin(0);
+        $pdf->setFooterMargin(0);
 
         // Set the source file
         $pdf->setSourceFile($inputFile);
@@ -128,8 +130,12 @@ class PdfWatermarker
                 $pdf->AddPage('P', [$size['width'], $size['height']]);
             }
 
+            // Ensure no borders are drawn
+            $pdf->SetLineWidth(0);
+            $pdf->SetDrawColor(255, 255, 255, 0);
+
             // Use the imported page as a template - specify position explicitly
-            $pdf->useTemplate($templateId, 0, 0, $size['width'], $size['height']);
+            $pdf->useTemplate($templateId, 0, 0, $size['width'], $size['height'], true);
 
             // Apply watermarks to this page
             foreach ($this->watermarks as $watermark) {
@@ -247,22 +253,26 @@ class PdfWatermarker
     {
         $config = $watermark->getConfig();
         $text = $watermark->getText();
+        $position = $watermark->getPosition();
 
-        // Set font
+        // Adjust font size for middle-right position
+        $fontSize = $config->getFontSize();
+
+        // Set font with potentially adjusted size
         $pdf->SetFont($config->getFont(), $config->getFontStyle(), $config->getFontSize());
 
-        // Get position and text dimensions
-        $position = $watermark->getPosition();
+        // Get text dimensions
         $textWidth = $watermark->getAngle() != 0 ? $pdf->GetStringWidth($text) : ceil($pdf->GetStringWidth($text)) + 2;
-        $fontSize = $config->getFontSize();
 
         // Calculate rectangle dimensions - consistent for all positions
         $rectWidth = $textWidth + 2.0;
-        
+
         // Calculate font height based on TCPDF's font metrics
-        $fontHeight = $pdf->getFontSize();
-        // Set rectangle height to match text height
-        $rectHeight = $fontHeight + 2.0;
+        // For text watermarks, we want a much tighter fit around the text
+        // Adjust the font height to be proportional to the font size
+        $fontHeight = $fontSize * 0.4; // Significantly reduce the height to better fit the text
+        // Set rectangle height to match text height with minimal padding
+        $rectHeight = $fontHeight + 0.5; // Minimal padding
 
         // Initialize rectangle and text positions
         $rectX = 0;
@@ -286,27 +296,26 @@ class PdfWatermarker
             $textX = $rectX + 2.0; // Text aligned with rectangle
         }
 
-        // Vertical positioning
-        if (strpos($position, 'top') !== false) {
-            // Top alignment - stick to top border
-            $rectY = 0;
-            // For vertical centering, we need to account for the font's baseline
-            $textY = $rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05);
-        } elseif (strpos($position, 'bottom') !== false) {
-            // Bottom alignment - stick to bottom border
-            $rectY = $size['height'] - $rectHeight;
-            $textY = $rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05);
-        } else {
-            // Middle alignment
-            $rectY = ($size['height'] - $rectHeight) / 2;
-            $textY = $rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05);
-        }
+        // Calculate position using the same method as for image watermarks
+        list($rectX, $rectY) = $this->calculatePosition(
+            $position,
+            $size,
+            $rectWidth,
+            $rectHeight
+        );
 
-        // Apply rotation if needed
-        if ($watermark->getAngle() != 0) {
+        // Update textX to match the new rectX
+        $textX = $rectX + 2.0;
+
+        // Calculate textY based on rectY
+        $textY = max($rectY + ($rectHeight - $fontHeight) / 2 - ($fontSize * 0.05), 0.0);
+
+        // Apply rotation if angle is not 0 (only allowed for center position)
+        $angle = $watermark->getAngle();
+        if ($angle != 0) {
             $pdf->StartTransform();
             // Rotate around the center of the rectangle
-            $pdf->Rotate($watermark->getAngle(), $rectX + ($rectWidth / 2), $rectY + ($rectHeight / 2));
+            $pdf->Rotate($angle, $rectX + ($rectWidth / 2), $rectY + ($rectHeight / 2));
         }
 
         // Get background color and opacity
@@ -361,28 +370,43 @@ class PdfWatermarker
     {
         $config = $watermark->getConfig();
         $imagePath = $config->getImagePath();
+        $position = $watermark->getPosition();
 
         // Get image dimensions
         list($imgWidth, $imgHeight) = getimagesize($imagePath);
 
-        // Apply scaling
-        $scale = $config->getScale() ?? 1.0;
-        $imgWidth *= $scale;
-        $imgHeight *= $scale;
-        
-        // Check if image exceeds page size and scale down if necessary
+        // Calculate appropriate scale based on page size
         $pageWidth = $size['width'];
         $pageHeight = $size['height'];
+
+        // Get scale from config or calculate a default scale
+        $scale = $config->getScale();
         
+        // If no scale is provided, calculate a reasonable default scale
+        if ($scale === null) {
+            $scaleForWidth = $pageWidth / $imgWidth;
+            $scaledHeight = $imgHeight * $scaleForWidth;
+            if ($scaledHeight > ($pageHeight)) {
+                $scaleForHeight = ($pageHeight) / $imgHeight;
+                $scale = min($scaleForWidth, $scaleForHeight);
+            } else {
+                $scale = $scaleForWidth;
+            }
+        }
+
+        // Apply scaling
+        $imgWidth *= $scale;
+        $imgHeight *= $scale;
+
+        // Check if image exceeds page size and scale down if necessary
         if ($imgWidth > $pageWidth || $imgHeight > $pageHeight) {
             // Calculate scale factors for width and height
             $scaleWidth = $pageWidth / $imgWidth;
             $scaleHeight = $pageHeight / $imgHeight;
-            
+
             // Use the smaller scale factor to ensure image fits within page
-            // Round down to 2 decimal places
             $scaleFactor = floor(min($scaleWidth, $scaleHeight) * 100) / 100;
-            
+
             // Apply the scale factor to maintain aspect ratio
             $imgWidth *= $scaleFactor;
             $imgHeight *= $scaleFactor;
@@ -390,16 +414,17 @@ class PdfWatermarker
 
         // Calculate position
         list($x, $y) = $this->calculatePosition(
-            $watermark->getPosition(),
+            $position,
             $size,
             $imgWidth,
             $imgHeight
         );
 
-        // Apply rotation if needed
-        if ($watermark->getAngle() != 0) {
+        // Apply rotation if angle is not 0 (only allowed for center position)
+        $angle = $watermark->getAngle();
+        if ($angle != 0) {
             $pdf->StartTransform();
-            $pdf->Rotate($watermark->getAngle(), $x + ($imgWidth / 2), $y - ($imgHeight / 2));
+            $pdf->Rotate($angle, $x + ($imgWidth / 2), $y + ($imgHeight / 2));
         }
 
         // Set opacity
@@ -407,22 +432,29 @@ class PdfWatermarker
 
         // Adjust y-coordinate based on position
         // In TCPDF, the y-coordinate for Image is the top-left corner
-        $position = $watermark->getPosition();
-        if (strpos($position, 'bottom') !== false) {
-            // For bottom positioning, adjust y to place the image at the bottom
-            $y = $y - $imgHeight;
-        } elseif (strpos($position, 'top') !== false) {
-            // For top positioning, no adjustment needed as y already includes height
-        } else {
-            // For middle positioning, center the image vertically
-            $y = $y - $imgHeight;
+        switch ($position) {
+            case AbstractWatermark::POSITION_BOTTOM_LEFT:
+            case AbstractWatermark::POSITION_BOTTOM_CENTER:
+            case AbstractWatermark::POSITION_BOTTOM_RIGHT:
+                // For bottom positioning, adjust y to place the image at the bottom
+                $y = $y - $imgHeight;
+                break;
+                
+            case AbstractWatermark::POSITION_MIDDLE_LEFT:
+            case AbstractWatermark::POSITION_CENTER:
+            case AbstractWatermark::POSITION_MIDDLE_RIGHT:
+                // For middle positioning, adjust y to center the image vertically
+                $y = $y - ($imgHeight / 2);
+                break;
+                
+            // For top positions, no adjustment needed as y is already at the top
         }
 
         // Add image
         @$pdf->Image($imagePath, $x, $y, $imgWidth, $imgHeight);
 
-        // Reset transformation
-        if ($watermark->getAngle() != 0) {
+        // Reset transformation if rotation was applied
+        if ($angle != 0) {
             $pdf->StopTransform();
         }
     }
@@ -456,28 +488,54 @@ class PdfWatermarker
         $x = 0;
         $y = 0;
 
-        // Horizontal position - stick to borders
-        if (strpos($position, 'left') !== false) {
-            $x = 0; // Left border
-        } elseif (strpos($position, 'right') !== false) {
-            $x = $pageSize['width'] - $width; // Right border
-        } else {
-            // Center
-            $x = ($pageSize['width'] - $width) / 2;
+        // Handle horizontal position based on the exact position constant
+        switch ($position) {
+            case AbstractWatermark::POSITION_TOP_LEFT:
+            case AbstractWatermark::POSITION_MIDDLE_LEFT:
+            case AbstractWatermark::POSITION_BOTTOM_LEFT:
+                // Left alignment
+                $x = 0.0;
+                break;
+            
+            case AbstractWatermark::POSITION_TOP_RIGHT:
+            case AbstractWatermark::POSITION_MIDDLE_RIGHT:
+            case AbstractWatermark::POSITION_BOTTOM_RIGHT:
+                // Right alignment
+                $x = $pageSize['width'] - $width;
+                break;
+            
+            case AbstractWatermark::POSITION_TOP_CENTER:
+            case AbstractWatermark::POSITION_CENTER:
+            case AbstractWatermark::POSITION_BOTTOM_CENTER:
+            default:
+                // Center alignment
+                $x = ($pageSize['width'] - $width) / 2;
+                break;
         }
 
-        // Vertical position - stick to borders
-        if (strpos($position, 'top') !== false) {
-            $y = 0; // Top border
-            // In TCPDF, for Image(), y is the top-left corner
-            // No need to add height as we're already adjusting in applyImageWatermark
-        } elseif (strpos($position, 'bottom') !== false) {
-            $y = $pageSize['height']; // Bottom border
-            // Note: For image watermarks, we're already adjusting the y-coordinate in applyImageWatermark
-            // by subtracting the image height: $pdf->Image($imagePath, $x, $y - $imgHeight, $imgWidth, $imgHeight);
-        } else {
-            // Middle
-            $y = ($pageSize['height'] + $height) / 2;
+        // Handle vertical position based on the exact position constant
+        switch ($position) {
+            case AbstractWatermark::POSITION_TOP_LEFT:
+            case AbstractWatermark::POSITION_TOP_CENTER:
+            case AbstractWatermark::POSITION_TOP_RIGHT:
+                // Top alignment
+                $y = 0.45; // Add a small margin for top positions to ensure visibility
+                break;
+            
+            case AbstractWatermark::POSITION_BOTTOM_LEFT:
+            case AbstractWatermark::POSITION_BOTTOM_CENTER:
+            case AbstractWatermark::POSITION_BOTTOM_RIGHT:
+                // Bottom alignment
+                $y = $pageSize['height'] - $height;
+                break;
+            
+            case AbstractWatermark::POSITION_MIDDLE_LEFT:
+            case AbstractWatermark::POSITION_CENTER:
+            case AbstractWatermark::POSITION_MIDDLE_RIGHT:
+            default:
+                // Middle alignment
+                $y = ($pageSize['height'] / 2) - ($height / 2);
+                break;
         }
 
         return [$x, $y];
