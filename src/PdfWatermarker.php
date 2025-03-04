@@ -380,19 +380,7 @@ class PdfWatermarker
         $pageHeight = $size['height'];
 
         // Get scale from config or calculate a default scale
-        $scale = $config->getScale();
-        
-        // If no scale is provided, calculate a reasonable default scale
-        if ($scale === null) {
-            $scaleForWidth = $pageWidth / $imgWidth;
-            $scaledHeight = $imgHeight * $scaleForWidth;
-            if ($scaledHeight > ($pageHeight)) {
-                $scaleForHeight = ($pageHeight) / $imgHeight;
-                $scale = min($scaleForWidth, $scaleForHeight);
-            } else {
-                $scale = $scaleForWidth;
-            }
-        }
+        $scale = ($config->getScale() ?? 1.0) * 0.15;
 
         // Apply scaling
         $imgWidth *= $scale;
@@ -433,13 +421,6 @@ class PdfWatermarker
         // Adjust y-coordinate based on position
         // In TCPDF, the y-coordinate for Image is the top-left corner
         switch ($position) {
-            case AbstractWatermark::POSITION_BOTTOM_LEFT:
-            case AbstractWatermark::POSITION_BOTTOM_CENTER:
-            case AbstractWatermark::POSITION_BOTTOM_RIGHT:
-                // For bottom positioning, adjust y to place the image at the bottom
-                $y = $y - $imgHeight;
-                break;
-                
             case AbstractWatermark::POSITION_MIDDLE_LEFT:
             case AbstractWatermark::POSITION_CENTER:
             case AbstractWatermark::POSITION_MIDDLE_RIGHT:
@@ -447,7 +428,7 @@ class PdfWatermarker
                 $y = $y - ($imgHeight / 2);
                 break;
                 
-            // For top positions, no adjustment needed as y is already at the top
+            // For top and bottom positions, no adjustment needed as calculatePosition already returns the correct coordinates
         }
 
         // Add image

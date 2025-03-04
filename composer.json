@@ -1,6 +1,6 @@
 {
   "name": "tomedio/pdf-watermark",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "A PHP library for adding text and image watermarks to PDF files using FPDI",
   "type": "library",
   "require": {
